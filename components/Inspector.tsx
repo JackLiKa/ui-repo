@@ -52,7 +52,6 @@ import {
   iconSlotsOf,
   setIconSlot,
   removeTabPatch,
-  tabCountPatch,
   variantStyle,
   scaleR,
   Place,
@@ -795,7 +794,6 @@ export function Inspector({
   const tabs: NavTab[] = item.tabs ?? [];
   const variants = spec.hasVariant ? variantsOf(item.kind) : [];
 
-  const setTabCount = (n: number) => onChange(tabCountPatch(item, n, defaultTabsFor(item.kind)));
   /** entries of a tab row have no icon; toolbar buttons have no label */
   const tabIcons = item.kind !== "tabs" && item.kind !== "select";
   const tabLabels = item.kind !== "toolbar";
@@ -805,8 +803,10 @@ export function Inspector({
     onChange({ tabs: tabs.map((t, j) => (j === i ? { ...t, label } : t)) });
   /** bars, rails and tab rows show one destination as selected */
   const isSelect = item.kind === "select";
-  /** options and tab rows grow one row at a time; bars, rails and menus keep the fixed counts M3 allows */
-  const growsFreely = isSelect || item.kind === "tabs";
+  /** every tabbed kind grows one row at a time; bars, rails, menus and toolbars keep at least two entries */
+  const minTabs = isSelect || item.kind === "tabs" ? 1 : 2;
+  const addKey = isSelect ? "addOption" : item.kind === "tabs" ? "addTab" : "addItem";
+  const removeKey = isSelect ? "removeOption" : item.kind === "tabs" ? "removeTab" : "removeItem";
   const hasSelected = item.kind === "bottomNav" || item.kind === "navRail" || item.kind === "tabs" || isSelect;
   /** drops one row; the selection and the per-tab tap targets follow their rows */
   const removeOption = (i: number) => onChange(removeTabPatch(item, i));
@@ -944,15 +944,6 @@ export function Inspector({
 
       {spec.hasTabs && !editOn && (
         <Section id="tabs" icon={isSelect ? "list" : "view_column"} title={t(isSelect ? "options" : "tabs", lang)} p={p} onToggle={(open) => { if (!open && activeSlot?.key.startsWith("tab:")) setPickerOpen(false); }}>
-          {!growsFreely && (
-            <Segmented
-              options={(item.kind === "toolbar" ? [2, 3, 4, 5, 6] : [2, 3, 4, 5]).map((n) => ({ key: String(n), label: String(n) }))}
-              value={String(tabs.length)}
-              onChange={(k) => setTabCount(Number(k))}
-              p={p}
-              height={36}
-            />
-          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
             {tabs.map((tab, i) => {
               const on = slotKey === `tab:${i}` && pickerOpen;
@@ -998,23 +989,21 @@ export function Inspector({
                   {tabIcons && tab.icon && (
                     <IconBtn icon="close" p={p} size={40} onClick={() => onChange(setIconSlot(item, `tab:${i}`, null))} title={t("noIcon", lang)} />
                   )}
-                  {growsFreely && tabs.length > 1 && (
-                    <IconBtn icon="close" p={p} size={40} onClick={() => removeOption(i)} title={t(isSelect ? "removeOption" : "removeTab", lang)} />
+                  {tabs.length > minTabs && (
+                    <IconBtn icon="close" p={p} size={40} onClick={() => removeOption(i)} title={t(removeKey, lang)} />
                   )}
                 </div>
               );
             })}
           </div>
-          {growsFreely && (
-            <button
-              onClick={() => onChange({ tabs: [...tabs, { ...defaultTabsFor(item.kind)[tabs.length % defaultTabsFor(item.kind).length] }] })}
-              className="m3-press"
-              style={{ marginTop: 8, height: 40, width: "100%", borderRadius: 20, border: `1px solid ${p.outline}`, background: "transparent", color: p.primary, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-            >
-              <Icon name="add" size={18} />
-              {t(isSelect ? "addOption" : "addTab", lang)}
-            </button>
-          )}
+          <button
+            onClick={() => onChange({ tabs: [...tabs, { ...defaultTabsFor(item.kind)[tabs.length % defaultTabsFor(item.kind).length] }] })}
+            className="m3-press"
+            style={{ marginTop: 8, height: 40, width: "100%", borderRadius: 20, border: `1px solid ${p.outline}`, background: "transparent", color: p.primary, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          >
+            <Icon name="add" size={18} />
+            {t(addKey, lang)}
+          </button>
           {hasSelected && !isSelect && (
             <div style={{ fontSize: 12, lineHeight: 1.5, color: p.onSurfaceVariant, padding: "8px 6px 0" }}>{t("selectedHint", lang)}</div>
           )}

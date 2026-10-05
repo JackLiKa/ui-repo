@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useDragControls } from "motion/react";
-import { CONTRASTS, Contrast, FONTS, Item, KIND_SPEC, NavTab, PALETTES, Palette, SHAPES, ShapeScale, Theme, defaultTabsFor, iconSlotsOf, setIconSlot } from "@/lib/tokens";
+import { CONTRASTS, Contrast, FONTS, Item, KIND_SPEC, NavTab, PALETTES, Palette, SHAPES, ShapeScale, Theme, defaultTabsFor, iconSlotsOf, removeTabPatch, setIconSlot } from "@/lib/tokens";
 import { ensureFontLoaded } from "@/lib/theme";
 import { KIND_TEXT, LANGS, Lang, t, useLang } from "@/lib/i18n";
 import { IconPicker } from "./IconPicker";
@@ -123,14 +123,12 @@ export function MobileInspector({
   const variants = spec.hasVariant ? variantsOf(item.kind) : [];
   const tabs: NavTab[] = item.tabs ?? [];
   const [tabSlot, setTabSlot] = useState<number | null>(null);
-  const setTabCount = (n: number) => {
-    const defaults = defaultTabsFor(item.kind);
-    const next: NavTab[] = [];
-    for (let i = 0; i < n; i++) next.push(tabs[i] ? { ...tabs[i] } : { ...defaults[i % defaults.length] });
-    onChange({ tabs: next, selected: item.selected !== undefined && item.selected >= n ? undefined : item.selected });
-  };
   /* a dropdown's rows are options: no icons, and one of them may be the initial value */
   const isSelect = item.kind === "select";
+  /** every tabbed kind grows one row at a time; bars and toolbars keep at least two entries */
+  const minTabs = isSelect || item.kind === "tabs" ? 1 : 2;
+  const addKey = isSelect ? "addOption" : item.kind === "tabs" ? "addTab" : "addItem";
+  const removeKey = isSelect ? "removeOption" : item.kind === "tabs" ? "removeTab" : "removeItem";
 
   return (
     <div>
@@ -181,15 +179,6 @@ export function MobileInspector({
 
       {spec.hasTabs && (
         <Row icon={isSelect ? "list" : "view_column"} label={t(isSelect ? "options" : "tabs", lang)} p={p}>
-          {!isSelect && item.kind !== "tabs" && (
-            <Segmented
-              options={(item.kind === "toolbar" ? [2, 3, 4, 5, 6] : [2, 3, 4, 5]).map((n) => ({ key: String(n), label: String(n) }))}
-              value={String(tabs.length)}
-              onChange={(k) => setTabCount(Number(k))}
-              p={p}
-              height={44}
-            />
-          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
             {tabs.map((tab, i) => (
               <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -209,28 +198,26 @@ export function MobileInspector({
                 {item.kind !== "toolbar" && (
                   <Field value={tab.label} onChange={(label) => onChange({ tabs: tabs.map((x, j) => (j === i ? { ...x, label } : x)) })} placeholder={t("label", lang)} p={p} height={48} />
                 )}
-                {isSelect && tabs.length > 1 && (
+                {tabs.length > minTabs && (
                   <IconBtn
                     icon="close"
                     p={p}
                     size={48}
-                    onClick={() => onChange({ tabs: tabs.filter((_, j) => j !== i), selected: item.selected === undefined ? undefined : item.selected === i ? undefined : item.selected > i ? item.selected - 1 : item.selected })}
-                    title={t("removeOption", lang)}
+                    onClick={() => onChange(removeTabPatch(item, i))}
+                    title={t(removeKey, lang)}
                   />
                 )}
               </div>
             ))}
           </div>
-          {isSelect && (
-            <button
-              onClick={() => onChange({ tabs: [...tabs, { ...defaultTabsFor(item.kind)[tabs.length % defaultTabsFor(item.kind).length] }] })}
-              className="m3-press"
-              style={{ marginTop: 8, height: 48, width: "100%", borderRadius: 24, border: `1px solid ${p.outline}`, background: "transparent", color: p.primary, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-            >
-              <Icon name="add" size={20} />
-              {t("addOption", lang)}
-            </button>
-          )}
+          <button
+            onClick={() => onChange({ tabs: [...tabs, { ...defaultTabsFor(item.kind)[tabs.length % defaultTabsFor(item.kind).length] }] })}
+            className="m3-press"
+            style={{ marginTop: 8, height: 48, width: "100%", borderRadius: 24, border: `1px solid ${p.outline}`, background: "transparent", color: p.primary, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          >
+            <Icon name="add" size={20} />
+            {t(addKey, lang)}
+          </button>
           {tabSlot !== null && tabs[tabSlot] && (
             <div style={{ marginTop: 8 }}>
               <IconPicker value={tabs[tabSlot].icon || null} onChange={(icon) => onChange(setIconSlot(item, `tab:${tabSlot}`, icon))} onClose={() => setTabSlot(null)} palette={p} />
